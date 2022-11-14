@@ -4,24 +4,19 @@ use rand_distr::{Distribution, StandardNormal, UnitCircle};
 
 use eframe::egui;
 
-use egui::plot::{Plot, Line, PlotPoints};
+use egui::plot::{Line, Plot, PlotPoints};
 
+use std::collections::VecDeque;
 use std::rc::Rc;
-use std::thread;
-use std::sync::{mpsc, Arc};
-use std::time::Duration;
 use std::sync::Mutex;
+use std::sync::{mpsc, Arc};
+use std::thread;
+use std::time::Duration;
 
 use std::f64::consts::PI;
 
-
-macro_rules! zip {
-    ($x: expr) => ($x);
-    ($x: expr, $($y: expr), +) => (
-        $x.iter().zip(
-            zip!($($y), +))
-    )
-}
+#[macro_use]
+extern crate approx;
 
 struct MyApp {
     index: i32,
@@ -29,12 +24,9 @@ struct MyApp {
 
 impl Default for MyApp {
     fn default() -> Self {
-        Self {
-            index: 0,
-        }
+        Self { index: 0 }
     }
 }
-
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -42,33 +34,43 @@ impl eframe::App for MyApp {
             ui.heading("My egui Application");
             ui.add(egui::Slider::new(&mut self.index, 0..=12).text("index"));
 
-            let sin: PlotPoints = (0..1000).map(|i| {
-                let x = (i*self.index) as f64 * 0.01; 
-                [x, x.sin()]
-            }).collect();
+            let sin: PlotPoints = (0..1000)
+                .map(|i| {
+                    let x = (i * self.index) as f64 * 0.01;
+                    [x, x.sin()]
+                })
+                .collect();
             let line = Line::new(sin);
-            Plot::new("my_plot").view_aspect(2.0).show(ui, |plot_ui| plot_ui.line(line));
+            Plot::new("my_plot")
+                .view_aspect(2.0)
+                .show(ui, |plot_ui| plot_ui.line(line));
         });
-
     }
 }
-
 
 fn main() {
     println!("Hello, world!");
 
-    let r1 = gen_rotation_matrix(3.1415/2.0, 0.0);
+    {
+        // test deque
+        let mut dq = VecDeque::from([0, 1, 2, 3, 4]);
+        let drained = dq.drain(0..2).collect::<VecDeque<_>>();
+        assert_eq!(drained, [0, 1]);
+        assert_eq!(dq, [2, 3, 4]);
+    }
+
+    let r1 = gen_rotation_matrix(3.1415 / 2.0, 0.0);
     println!("{}", r1);
-    let r2 = gen_rotation_matrix(3.1415/4.0, 0.0);
+    let r2 = gen_rotation_matrix(3.1415 / 4.0, 0.0);
     println!("{}", r2);
     let x180 = gen_rotation_matrix(3.1415, 0.0);
     println!("{x180:1.3}");
-    
+
     {
         let mut epg = EPGVecRepresentation::new(2);
         println!("{:?}", epg);
 
-        let r2 = gen_rotation_matrix(PI/4.0, 0.0);
+        let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
 
         rf_rotation(&mut epg, &r2);
         println!("{:?}", epg);
@@ -86,46 +88,69 @@ fn main() {
     //std::thread::spawn( || work_with_arrays() );
     // let options = eframe::NativeOptions::default();
     // eframe::run_native(
-    //     "My egui app", 
-    //     options, 
+    //     "My egui app",
+    //     options,
     //     Box::new(|_cc| Box:: new(MyApp::default())),
     // );
-
 }
 
-fn eiphi(phi:f64) -> Complex64 {
-    (Complex::i()*phi).exp()
+fn eiphi(phi: f64) -> Complex64 {
+    (Complex::i() * phi).exp()
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct EPGVecRepresentation {
     length: usize,
-    f_p : Vec<Complex64>,
-    f_n : Vec<Complex64>,
-    z: Vec<Complex64>,
+    f_p: VecDeque<Complex64>,
+    f_n: VecDeque<Complex64>,
+    z: VecDeque<Complex64>,
 }
 
-
 impl EPGVecRepresentation {
-    fn new(sz: usize) -> Self {
-        let length = sz;
-        let mut f_p = Vec::with_capacity(length);
-        let mut f_n = Vec::with_capacity(length);
-        let mut z = Vec::with_capacity(length);
+    fn new(n_states: usize) -> Self {
+        let length = n_states;
+        let mut f_p = VecDeque::with_capacity(length);
+        let mut f_n = VecDeque::with_capacity(length);
+        let mut z = VecDeque::with_capacity(length);
 
-        f_p.push(Complex64::from(0.0));
-        f_n.push(Complex64::from(0.0));
-        z.push(Complex64::from(1.0));
+        f_p.push_back(Complex64::from(0.0));
+        f_n.push_back(Complex64::from(0.0));
+        z.push_back(Complex64::from(1.0));
 
-        for _ in 1 .. length {
-            f_p.push(Complex64::from(0.0));
-            f_n.push(Complex64::from(0.0));
-            z.push(Complex64::from(0.0));
+        for _ in 1..length {
+            f_p.push_back(Complex64::from(0.0));
+            f_n.push_back(Complex64::from(0.0));
+            z.push_back(Complex64::from(0.0));
         }
 
         Self {
-            length, f_p, f_n, z
+            length,
+            f_p,
+            f_n,
+            z,
         }
+    }
+
+    fn read(epg: &Self) -> Complex64 {
+        epg.f_p[0]
+    }
+
+    fn excite(epg: &mut Self) {
+        let rot = gen_rotation_matrix(PI / 2.0, 0.0);
+        Self::rotate(epg, &rot);
+    }
+
+    fn rotate(epg: &mut Self, rmat: &Array<Complex64, Ix2>) {
+        rf_rotation(epg, rmat);
+    }
+
+    fn grelax(epg: &mut Self, dt: f64, t1: f64, t2: f64, ntwists: i64) {
+        gradient_shift(epg, ntwists);
+        relaxation(epg, dt, t1, t2);
+    }
+
+    fn delay(epg: &mut Self, dt: f64, t1: f64, t2: f64) {
+        relaxation(epg, dt, t1, t2);
     }
 }
 
@@ -135,12 +160,8 @@ impl Default for EPGVecRepresentation {
     }
 }
 
-
-
-fn rf_rotation(epg : &mut EPGVecRepresentation, rmat : &Array<Complex64, Ix2>) 
-{
-    for ix in 0..epg.length
-    {
+fn rf_rotation(epg: &mut EPGVecRepresentation, rmat: &Array<Complex64, Ix2>) {
+    for ix in 0..epg.length {
         // we don't want this copy here but we can't dot() with references.
         // option1 : rewrite own dot (not hard)
         // option2 : use arr2 as underlying structure.
@@ -152,11 +173,10 @@ fn rf_rotation(epg : &mut EPGVecRepresentation, rmat : &Array<Complex64, Ix2>)
     }
 }
 
-fn relaxation(epg : &mut EPGVecRepresentation, dt : f64, t1:f64, t2: f64) 
-{
-    let t1d = Complex::from((-dt/t1).exp());
-    let t2d = Complex::from((-dt/t2).exp());
-    
+fn relaxation(epg: &mut EPGVecRepresentation, dt: f64, t1: f64, t2: f64) {
+    let t1d = Complex::from((-dt / t1).exp());
+    let t2d = Complex::from((-dt / t2).exp());
+
     for x in epg.f_n.iter_mut() {
         *x = *x * t2d
     }
@@ -166,16 +186,15 @@ fn relaxation(epg : &mut EPGVecRepresentation, dt : f64, t1:f64, t2: f64)
     }
 
     for (ix, z) in epg.z.iter_mut().enumerate() {
-       if ix == 0 {
-           *z =  (1.0 - t1d) + (*z * t1d)
-       }
-       else {
-           *z = *z * t1d
-       } 
+        if ix == 0 {
+            *z = (1.0 - t1d) + (*z * t1d)
+        } else {
+            *z = *z * t1d
+        }
     }
 }
 
-fn gen_rotation_matrix(alpha: f64, phi: f64) -> Array<Complex64, Ix2> { 
+fn gen_rotation_matrix(alpha: f64, phi: f64) -> Array<Complex64, Ix2> {
     // make coefficients
     let sa = Complex::from(alpha.sin());
     let ca = Complex::from(alpha.cos());
@@ -184,30 +203,87 @@ fn gen_rotation_matrix(alpha: f64, phi: f64) -> Array<Complex64, Ix2> {
 
     let ca2 = Complex::from((alpha / 2.0).cos());
     let sa2 = Complex::from((alpha / 2.0).sin());
-    
-    array![ 
-        [ ca2*ca2, sa2*sa2*eiphi(2.0*phi), -j*eiphi(phi)*sa ],
-        [eiphi(-2.0*phi)*sa2*sa2, ca2*ca2, j*eiphi(-phi)*sa ],
-        [ -j/2.0 * eiphi(-phi)*sa, j/2.0*eiphi(phi)*sa, ca ]
+
+    array![
+        [
+            ca2 * ca2,
+            sa2 * sa2 * eiphi(2.0 * phi),
+            -j * eiphi(phi) * sa
+        ],
+        [
+            eiphi(-2.0 * phi) * sa2 * sa2,
+            ca2 * ca2,
+            j * eiphi(-phi) * sa
+        ],
+        [-j / 2.0 * eiphi(-phi) * sa, j / 2.0 * eiphi(phi) * sa, ca]
     ]
 }
 
+fn gradient_shift(epg: &mut EPGVecRepresentation, ntwists: i64) {
+    // Shift states.
+    // nshfits represents the number of 2pi dephasing steps to shift by
+    // F0 is special, since f_p [0] is f0, and f_n[0] is f0*(conj)
 
-fn gradeint_shift(n_twists: i64) {
+    match ntwists {
+        n if n == 0 => return,
+        n if n > 0 => {
+            // f_p becomes more positive. f_m becomes less negative
+            // do shift
+            let _ = epg.f_n.pop_front().unwrap(); // f0c discard
+            let f1 = epg.f_n.pop_front().unwrap();
 
+            let f1c = f1.conj();
+            epg.f_p.push_front(f1);
+            epg.f_n.push_front(f1c);
+
+            // we've pop'd 2 from f_n and pushed 1. So length is one less.
+            // add zero to the end.
+            epg.f_n.push_back(Complex64::from(0.0));
+
+            // pop end of f_p to maintain length
+            let _ = epg.f_p.pop_back().unwrap();
+
+            // recurse
+            gradient_shift(epg, n - 1);
+        }
+        n if n < 0 => {
+            // f_p becomes less positive. f_m becomes more negative
+            let _ = epg.f_n.pop_front().unwrap(); // f0c discard
+                                                  // [ f0, f1, f2 ...] --> [f1, f2, ...]
+
+            let f0 = epg.f_p.pop_front().unwrap();
+
+            let f1 = epg.f_p.front().unwrap();
+
+            let f1c = f1.conj();
+
+            epg.f_n.push_front(f0);
+            epg.f_n.push_front(f1c);
+
+            // we've pop'd 2 from f_n and pushed 1. So length is one less.
+            // add zero to the end.
+            epg.f_p.push_back(Complex64::from(0.0));
+
+            // pop end of f_n to maintain length
+            let _ = epg.f_n.pop_back().unwrap();
+
+            // recurse
+            gradient_shift(epg, n + 1)
+        }
+        _ => unreachable!("Should never happen."),
+    }
 }
 
 // How do we implement the algorithm?
 // Gradients : moving f states. Depends on matirx vs vector storage.
 // is a dequeue better than vector ?
 // For RF parts:
-// Option 1: 3 vectors, zip and multiple as we go 
-// Dense array: transpose and loop vs loop and lookup ? 
-// Relaxation : T2 affects all F states and F*. 
+// Option 1: 3 vectors, zip and multiple as we go
+// Dense array: transpose and loop vs loop and lookup ?
+// Relaxation : T2 affects all F states and F*.
 //   T1 decay all Z states
-// . T1 recovery just Z0 state 
-// recording signal, same. 
-
+// . T1 recovery just Z0 state
+// recording signal, same.
 
 fn work_with_arrays() {
     {
@@ -289,18 +365,16 @@ fn work_with_arrays() {
         println!("results: {:?}, {:?}, {:?}, {:?}", sum1, sum3, sum4, mutable);
         println!("\n\n");
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
     use super::*;
     #[test]
     fn test_180_rotation() {
-
-        let mut epg = EPGVecRepresentation::new(2);
-        println!("{:?}", epg);
+        let mut epg = EPGVecRepresentation::new(1);
 
         let r2 = gen_rotation_matrix(PI, 0.0);
 
@@ -310,5 +384,70 @@ mod tests {
         relaxation(&mut epg, 100e-3, 1.0, 0.1);
     }
 
+    #[test]
+    fn test_shift_symmetric() {
+        let mut epg = EPGVecRepresentation::new(3);
+        let mut epg2 = EPGVecRepresentation::new(3);
 
+        let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
+
+        rf_rotation(&mut epg, &r2);
+        rf_rotation(&mut epg2, &r2);
+
+        gradient_shift(&mut epg, 2);
+        println!("{:?}", epg);
+        gradient_shift(&mut epg, -2);
+        println!("{:?}", epg);
+
+        // assert_eq!(&epg.f_p, &epg2.f_p);
+        // assert_eq!(&epg.f_n, &epg2.f_n);
+        // assert_eq!(&epg.z, &epg2.z);
+        assert_eq!(&epg, &epg2);
+    }
+
+    #[test]
+    fn test_shift_conjs() {
+        let mut epg = EPGVecRepresentation::new(3);
+        let mut epg2 = EPGVecRepresentation::new(3);
+
+        let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
+
+        rf_rotation(&mut epg, &r2);
+        rf_rotation(&mut epg2, &r2);
+
+        gradient_shift(&mut epg, 1);
+        println!("{:?}", epg);
+        gradient_shift(&mut epg, -1);
+        println!("{:?}", epg);
+
+        assert_eq!(&epg, &epg2);
+    }
+
+    #[test]
+    fn test_flipback() {
+        let mut epg = EPGVecRepresentation::new(3);
+        let mut epg2 = EPGVecRepresentation::new(3);
+
+        let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
+        let rm2 = gen_rotation_matrix(-PI / 4.0, 0.0);
+
+        rf_rotation(&mut epg, &r2);
+        rf_rotation(&mut epg, &rm2);
+
+        assert_eq!(&epg, &epg2);
+    }
+
+    #[test]
+    fn test_flipback() {
+        let mut epg = EPGVecRepresentation::new(3);
+        let mut epg2 = EPGVecRepresentation::new(3);
+
+        let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
+        let rm2 = gen_rotation_matrix(-PI / 4.0, 0.0);
+
+        rf_rotation(&mut epg, &r2);
+        rf_rotation(&mut epg, &rm2);
+
+        assert_eq!(&epg, &epg2);
+    }
 }
