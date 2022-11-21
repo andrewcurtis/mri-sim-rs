@@ -7,6 +7,7 @@ use eframe::egui;
 use egui::plot::{Line, Plot, PlotPoints};
 
 use std::collections::VecDeque;
+use std::fmt;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
@@ -51,14 +52,6 @@ impl eframe::App for MyApp {
 fn main() {
     println!("Hello, world!");
 
-    {
-        // test deque
-        let mut dq = VecDeque::from([0, 1, 2, 3, 4]);
-        let drained = dq.drain(0..2).collect::<VecDeque<_>>();
-        assert_eq!(drained, [0, 1]);
-        assert_eq!(dq, [2, 3, 4]);
-    }
-
     let r1 = gen_rotation_matrix(3.1415 / 2.0, 0.0);
     println!("{}", r1);
     let r2 = gen_rotation_matrix(3.1415 / 4.0, 0.0);
@@ -67,22 +60,34 @@ fn main() {
     println!("{x180:1.3}");
 
     {
-        let mut epg = EPGVecRepresentation::new(2);
-        println!("{:?}", epg);
+        let mut epg = EPGVecRepresentation::new(5);
+        println!("{}", epg);
+
+        
+        epg.excite();
 
         let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
 
         rf_rotation(&mut epg, &r2);
-        println!("{:?}", epg);
+        println!("{}", epg);
 
-        relaxation(&mut epg, 100e-3, 1.0, 0.1);
-        println!("Relaxed 1 {:?}", epg);
+        let t1 = 1.0;
+        let t2= 0.05;
+        let dt = 1e-3;
 
-        relaxation(&mut epg, 100e-3, 1.0, 0.1);
-        println!("Relaxed 2 {:?}", epg);
+        epg.grelax(dt, t1, t2, 1);
+        println!("1\n{}", epg);
 
-        relaxation(&mut epg, 500e-3, 1.0, 0.1);
-        println!("Relaxed 3 {:?}", epg);
+        epg.grelax(dt, t1, t2, 1);
+        println!("2\n{}", epg);
+
+        epg.rotate(&x180);
+
+        epg.grelax(dt, t1, t2, 1);
+        println!("3\n{}", epg);
+
+        epg.grelax(dt, t1, t2, 1);
+        println!("4\n{}", epg);
     }
 
     //std::thread::spawn( || work_with_arrays() );
@@ -104,6 +109,15 @@ struct EPGVecRepresentation {
     f_p: VecDeque<Complex64>,
     f_n: VecDeque<Complex64>,
     z: VecDeque<Complex64>,
+}
+
+impl fmt::Display for EPGVecRepresentation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for ix in 0..self.length {
+            write!(f, "f+ {:.3}\tf- {:.3}\tz {:.3}\n", self.f_p[ix], self.f_n[ix], self.z[ix])?;
+        }
+        Ok(())
+    }
 }
 
 impl EPGVecRepresentation {
@@ -131,26 +145,26 @@ impl EPGVecRepresentation {
         }
     }
 
-    fn read(epg: &Self) -> Complex64 {
-        epg.f_p[0]
+    pub fn read(&self) -> Complex64 {
+        self.f_p[0]
     }
 
-    fn excite(epg: &mut Self) {
+    pub fn excite(&mut self) {
         let rot = gen_rotation_matrix(PI / 2.0, 0.0);
-        Self::rotate(epg, &rot);
+        Self::rotate(self, &rot);
     }
 
-    fn rotate(epg: &mut Self, rmat: &Array<Complex64, Ix2>) {
-        rf_rotation(epg, rmat);
+    pub fn rotate(&mut self, rmat: &Array<Complex64, Ix2>) {
+        rf_rotation(self, rmat);
     }
 
-    fn grelax(epg: &mut Self, dt: f64, t1: f64, t2: f64, ntwists: i64) {
-        gradient_shift(epg, ntwists);
-        relaxation(epg, dt, t1, t2);
+    pub fn grelax(&mut self, dt: f64, t1: f64, t2: f64, ntwists: i64) {
+        gradient_shift(self, ntwists);
+        relaxation(self, dt, t1, t2);
     }
 
-    fn delay(epg: &mut Self, dt: f64, t1: f64, t2: f64) {
-        relaxation(epg, dt, t1, t2);
+    pub fn delay(self: &mut Self, dt: f64, t1: f64, t2: f64) {
+        relaxation(self, dt, t1, t2);
     }
 }
 
