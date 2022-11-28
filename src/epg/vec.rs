@@ -229,6 +229,29 @@ mod tests {
         assert_eq!(&epg, &epg2);
     }
 
+    fn test_complex_close_l1(a: &Complex64, b: &Complex64, tolerance: f64) -> bool {
+        let diff = a.norm() - b.norm();
+        if diff.abs() <= tolerance {
+            return true;
+        } else {
+            return false;
+        }
+    }
+   
+    fn epg_close(epg1 : &EPGVecRepresentation, epg2: &EPGVecRepresentation)
+    {
+
+        let tol = 1e-9;
+        assert!(epg1.f_p.iter().zip(epg2.f_p.iter())
+           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) ) ;
+
+        assert!(epg1.f_n.iter().zip(epg2.f_n.iter())
+           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) );
+
+        assert!(epg1.z.iter().zip(epg2.z.iter())
+           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) );
+    }
+
     #[test]
     fn test_flipback() {
         let mut epg = EPGVecRepresentation::new(3);
@@ -240,6 +263,10 @@ mod tests {
         rf_rotation(&mut epg, &r2);
         rf_rotation(&mut epg, &rm2);
 
+        println!("{:?}", epg);
+        println!("{:?}", epg2);
+
+        epg_close(&epg, &epg2);
         assert_eq!(&epg, &epg2);
     }
 
