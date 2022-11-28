@@ -63,7 +63,6 @@ fn main() {
         let mut epg = EPGVecRepresentation::new(5);
         println!("{}", epg);
 
-        
         epg.excite();
 
         let r2 = gen_rotation_matrix(PI / 4.0, 0.0);
@@ -72,7 +71,7 @@ fn main() {
         println!("{}", epg);
 
         let t1 = 1.0;
-        let t2= 0.05;
+        let t2 = 0.05;
         let dt = 1e-3;
 
         epg.grelax(dt, t1, t2, 1);
@@ -114,7 +113,11 @@ struct EPGVecRepresentation {
 impl fmt::Display for EPGVecRepresentation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for ix in 0..self.length {
-            write!(f, "f+ {:.3}\tf- {:.3}\tz {:.3}\n", self.f_p[ix], self.f_n[ix], self.z[ix])?;
+            write!(
+                f,
+                "f+ {:.3}\tf- {:.3}\tz {:.3}\n",
+                self.f_p[ix], self.f_n[ix], self.z[ix]
+            )?;
         }
         Ok(())
     }
@@ -463,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    fn test_flipback() {
+    fn test_flipback2() {
         let mut epg = EPGVecRepresentation::new(3);
         let epg2 = EPGVecRepresentation::new(3);
 
