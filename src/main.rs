@@ -52,41 +52,41 @@ impl eframe::App for MyApp {
     }
 }
 
+fn fse_signal(etl: usize, t1: f64, t2: f64, esp: f64, debug_print: bool) {
+    let mut epg = epg::vec::EPGVecRepresentation::new(etl / 2 + 1);
+
+    let mut signal: Vec<Complex64> = Vec::with_capacity(etl + 1);
+
+    let x180 = epg::common::gen_rotation_matrix(PI, 0.0);
+
+    let dt = esp / 2.0;
+    let et1d = Complex::from((-dt / t1).exp());
+    let et2d = Complex::from((-dt / t2).exp());
+
+    epg.excite();
+
+    for _ in 0..etl {
+        epg.grelax(et1d, et2d, 1);
+        epg.rotate(&x180);
+        epg.grelax(et1d, et2d, 1);
+        if debug_print {
+            println!("{}", epg);
+        }
+
+        signal.push(epg.read());
+    }
+    println!("{:?}", signal);
+}
+
 fn main() {
     println!("Hello, world!");
 
-    let x180 = epg::common::gen_rotation_matrix(PI, 0.0);
-    println!("{x180:1.3}");
-
-    {
-        let mut epg = epg::vec::EPGVecRepresentation::new(5);
-        println!("{}", epg);
-
-        epg.excite();
-
-        let t1 = 1.0;
-        let t2 = 0.05;
-        let dt = 1e-3;
-
-        epg.grelax(dt, t1, t2, 1);
-        println!("1\n{}", epg);
-
-        epg.grelax(dt, t1, t2, 1);
-        println!("2\n{}", epg);
-
-        epg.rotate(&x180);
-
-        epg.grelax(dt, t1, t2, 1);
-        println!("3\n{}", epg);
-
-        epg.grelax(dt, t1, t2, 1);
-        println!("4\n{}", epg);
-    }
+    fse_signal(8, 1e9, 0.1, 0.01, false);
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(
         "My egui app",
         options,
-        Box::new(|_cc| Box:: new(MyApp::default())),
+        Box::new(|_cc| Box::new(MyApp::default())),
     );
 }

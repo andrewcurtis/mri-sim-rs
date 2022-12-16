@@ -7,6 +7,7 @@ pub(crate) trait EPG {
     fn read(&self) -> Complex64;
     fn excite(&mut self);
     fn rotate(&mut self, rmat: &Array<Complex64, Ix2>);
-    fn grelax(&mut self, dt: f64, t1: f64, t2: f64, ntwists: i64);
-    fn delay(&mut self, dt: f64, t1: f64, t2: f64);
+    fn spoil(&mut self, ntwists: i32);
+    fn grelax(&mut self, et1d: Complex64, et2d: Complex64, ntwists: i32);
+    fn delay(&mut self, et1d: Complex64, et2d: Complex64);
 }

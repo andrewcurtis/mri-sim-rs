@@ -1,4 +1,4 @@
-use ndarray::{array, Array, Ix2, arr1};
+use ndarray::{Array, Ix2, arr1};
 use num_complex::{Complex, Complex64};
 
 use std::collections::VecDeque;
@@ -69,13 +69,17 @@ impl crate::types::EPG for EPGVecRepresentation {
         rf_rotation(self, rmat);
     }
 
-    fn grelax(&mut self, dt: f64, t1: f64, t2: f64, ntwists: i64) {
+    fn spoil(&mut self, ntwists: i32) {
         gradient_shift(self, ntwists);
-        relaxation(self, dt, t1, t2);
     }
 
-    fn delay(self: &mut Self, dt: f64, t1: f64, t2: f64) {
-        relaxation(self, dt, t1, t2);
+    fn grelax(&mut self, et1d: Complex64, et2d: Complex64, ntwists: i32) {
+        gradient_shift(self, ntwists);
+        relaxation(self, et1d, et2d);
+    }
+
+    fn delay(self: &mut Self, et1d: Complex64, et2d: Complex64) {
+        relaxation(self, et1d, et2d);
     }
 }
 
@@ -98,27 +102,28 @@ fn rf_rotation(epg: &mut EPGVecRepresentation, rmat: &Array<Complex64, Ix2>) {
     }
 }
 
-fn relaxation(epg: &mut EPGVecRepresentation, dt: f64, t1: f64, t2: f64) {
-    let t1d = Complex::from((-dt / t1).exp());
-    let t2d = Complex::from((-dt / t2).exp());
+fn relaxation(epg: &mut EPGVecRepresentation, et1d: Complex64, et2d: Complex64) {
 
     for x in epg.f_n.iter_mut() {
-        *x = *x * t2d
+        *x = *x * et2d
     }
 
     for x in epg.f_p.iter_mut() {
-        *x = *x * t2d
+        *x = *x * et2d
     }
 
     for (ix, z) in epg.z.iter_mut().enumerate() {
         if ix == 0 {
-            *z = (1.0 - t1d) + (*z * t1d)
+            *z = (1.0 - et1d) + (*z * et1d)
         } else {
-            *z = *z * t1d
+            *z = *z * et1d
         }
     }
 }
-fn gradient_shift(epg: &mut EPGVecRepresentation, ntwists: i64) {
+
+
+// TODO: make a v2 that doesn't recurse and just shifts by multile steps 
+fn gradient_shift(epg: &mut EPGVecRepresentation, ntwists: i32) {
     // Shift states.
     // nshfits represents the number of 2pi dephasing steps to shift by
     // F0 is special, since f_p [0] is f0, and f_n[0] is f0*(conj)
@@ -187,7 +192,14 @@ mod tests {
         rf_rotation(&mut epg, &r2);
         println!("{:?}", epg);
 
-        relaxation(&mut epg, 100e-3, 1.0, 0.1);
+        let t1 = 1.0_f64;
+        let t2 = 0.05_f64;
+        let dt = 1e-3;
+        
+        let et1d = Complex::from((-dt/t1).exp());
+        let et2d = Complex::from((-dt/t2).exp());
+
+        relaxation(&mut epg, et1d, et2d);
     }
 
     #[test]
@@ -270,4 +282,29 @@ mod tests {
         assert_eq!(&epg, &epg2);
     }
 
+    #[test]
+    fn test_t2decay() {
+        let mut epg = EPGVecRepresentation::new(3);
+
+
+        epg.excite();
+
+
+        // \infty t1
+        let t1 = 1e9_f64;
+        // t2
+        let t2 = 0.10_f64;
+
+        let dt = 0.2_f64;
+        
+        let et1d = Complex::from((-dt/t1).exp());
+        let et2d = Complex::from((-dt/t2).exp());
+
+        epg.delay(et1d, et2d);
+
+        let signal = epg.read();
+
+        let expected = et2d;
+        assert_eq!(signal, expected);
+    }
 }
