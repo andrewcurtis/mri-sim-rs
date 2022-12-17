@@ -52,16 +52,29 @@ impl eframe::App for MyApp {
     }
 }
 
-fn fse_signal(etl: usize, t1: f64, t2: f64, esp: f64, debug_print: bool) {
+struct FseParams {
+    etl: usize,
+    t1: f64,
+    t2: f64,
+    esp: f64,
+    refocus_angle : f64,
+    cpmg_phase : f64,
+    debug_print : bool
+}
+
+fn fse_signal(params: FseParams) {
+    let etl = params.etl;
+
     let mut epg = epg::vec::EPGVecRepresentation::new(etl / 2 + 1);
 
     let mut signal: Vec<Complex64> = Vec::with_capacity(etl + 1);
 
-    let x180 = epg::common::gen_rotation_matrix(PI, 0.0);
+    let x180 = epg::common::gen_rotation_matrix(params.refocus_angle, params.cpmg_phase);
 
-    let dt = esp / 2.0;
-    let et1d = Complex::from((-dt / t1).exp());
-    let et2d = Complex::from((-dt / t2).exp());
+    // dt is the spacing of our events, unsed for dephasing/relaxation
+    let dt = params.esp / 2.0;
+    let et1d = Complex::from((-dt / params.t1).exp());
+    let et2d = Complex::from((-dt / params.t2).exp());
 
     epg.excite();
 
@@ -69,19 +82,34 @@ fn fse_signal(etl: usize, t1: f64, t2: f64, esp: f64, debug_print: bool) {
         epg.grelax(et1d, et2d, 1);
         epg.rotate(&x180);
         epg.grelax(et1d, et2d, 1);
-        if debug_print {
+        if params.debug_print {
             println!("{}", epg);
         }
 
         signal.push(epg.read());
     }
-    println!("{:?}", signal);
+    println!("Signal: {:?}", signal);
+    println!("{:}", epg::vec::to_mxy(&epg));
+    println!("{:}", epg::vec::to_mz(&epg));
+
+
+
+
 }
 
 fn main() {
     println!("Hello, world!");
 
-    fse_signal(8, 1e9, 0.1, 0.01, false);
+    let params = FseParams {
+        etl: 10,
+        esp: 0.01,
+        t1: 0.5,
+        t2: 0.1,
+        refocus_angle: PI/2.0,
+        cpmg_phase: PI/2.0,
+        debug_print: false
+    };
+    fse_signal(params);
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(

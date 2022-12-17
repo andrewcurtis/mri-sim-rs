@@ -1,4 +1,4 @@
-use ndarray::{Array, Ix2, arr1};
+use ndarray::{arr1, Array, Ix2};
 use num_complex::{Complex, Complex64};
 
 use std::collections::VecDeque;
@@ -8,7 +8,6 @@ use std::f64::consts::PI;
 
 use super::common::gen_rotation_matrix;
 use crate::types::EPG;
-
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct EPGVecRepresentation {
@@ -89,6 +88,38 @@ impl Default for EPGVecRepresentation {
     }
 }
 
+pub(crate) fn to_mxy(epg: &EPGVecRepresentation) -> Complex64 {
+    // sum every element of epg.f_p
+    let pos_sum: Complex64 = epg
+        .f_p
+        .iter()
+        .enumerate()
+        .map(|(ix, x)| x * (Complex::i() * (2.0 * PI * ix as f64)).exp())
+        .sum();
+    // sum every element of epg.f_n, skipping first
+    let neg_sum: Complex64 = epg
+        .f_n
+        .iter()
+        .skip(1)
+        .enumerate()
+        .map(|(ix, x)| x * (Complex::i() * (2.0 * PI * ix as f64)).exp())
+        .sum();
+
+    pos_sum + neg_sum
+}
+
+pub(crate) fn to_mz(epg: &EPGVecRepresentation) -> Complex64 {
+    let mut mz = Complex64::from(0.0);
+    // sum every element of epg.z
+    mz = epg.z.iter().skip(1)
+        .enumerate()
+        .map(|(ix, x)| x * (Complex::i() * (2.0 * PI * ix as f64)).exp())
+        .sum();
+    mz = 2.0*mz + epg.z[0];
+    // sum every element of epg.f_n, skipping first
+    mz
+}
+
 fn rf_rotation(epg: &mut EPGVecRepresentation, rmat: &Array<Complex64, Ix2>) {
     for ix in 0..epg.length {
         // we don't want this copy here but we can't dot() with references.
@@ -103,7 +134,6 @@ fn rf_rotation(epg: &mut EPGVecRepresentation, rmat: &Array<Complex64, Ix2>) {
 }
 
 fn relaxation(epg: &mut EPGVecRepresentation, et1d: Complex64, et2d: Complex64) {
-
     for x in epg.f_n.iter_mut() {
         *x = *x * et2d
     }
@@ -121,8 +151,7 @@ fn relaxation(epg: &mut EPGVecRepresentation, et1d: Complex64, et2d: Complex64) 
     }
 }
 
-
-// TODO: make a v2 that doesn't recurse and just shifts by multile steps 
+// TODO: make a v2 that doesn't recurse and just shifts by multile steps
 fn gradient_shift(epg: &mut EPGVecRepresentation, ntwists: i32) {
     // Shift states.
     // nshfits represents the number of 2pi dephasing steps to shift by
@@ -178,7 +207,6 @@ fn gradient_shift(epg: &mut EPGVecRepresentation, ntwists: i32) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -195,9 +223,9 @@ mod tests {
         let t1 = 1.0_f64;
         let t2 = 0.05_f64;
         let dt = 1e-3;
-        
-        let et1d = Complex::from((-dt/t1).exp());
-        let et2d = Complex::from((-dt/t2).exp());
+
+        let et1d = Complex::from((-dt / t1).exp());
+        let et2d = Complex::from((-dt / t2).exp());
 
         relaxation(&mut epg, et1d, et2d);
     }
@@ -249,19 +277,26 @@ mod tests {
             return false;
         }
     }
-   
-    fn epg_close(epg1 : &EPGVecRepresentation, epg2: &EPGVecRepresentation)
-    {
 
+    fn epg_close(epg1: &EPGVecRepresentation, epg2: &EPGVecRepresentation) {
         let tol = 1e-9;
-        assert!(epg1.f_p.iter().zip(epg2.f_p.iter())
-           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) ) ;
+        assert!(epg1
+            .f_p
+            .iter()
+            .zip(epg2.f_p.iter())
+            .all(|(p1, p2)| test_complex_close_l1(p1, p2, tol)));
 
-        assert!(epg1.f_n.iter().zip(epg2.f_n.iter())
-           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) );
+        assert!(epg1
+            .f_n
+            .iter()
+            .zip(epg2.f_n.iter())
+            .all(|(p1, p2)| test_complex_close_l1(p1, p2, tol)));
 
-        assert!(epg1.z.iter().zip(epg2.z.iter())
-           .all(|(p1, p2)|  test_complex_close_l1(p1, p2, tol) ) );
+        assert!(epg1
+            .z
+            .iter()
+            .zip(epg2.z.iter())
+            .all(|(p1, p2)| test_complex_close_l1(p1, p2, tol)));
     }
 
     #[test]
@@ -286,9 +321,7 @@ mod tests {
     fn test_t2decay() {
         let mut epg = EPGVecRepresentation::new(3);
 
-
         epg.excite();
-
 
         // \infty t1
         let t1 = 1e9_f64;
@@ -296,9 +329,9 @@ mod tests {
         let t2 = 0.10_f64;
 
         let dt = 0.2_f64;
-        
-        let et1d = Complex::from((-dt/t1).exp());
-        let et2d = Complex::from((-dt/t2).exp());
+
+        let et1d = Complex::from((-dt / t1).exp());
+        let et2d = Complex::from((-dt / t2).exp());
 
         epg.delay(et1d, et2d);
 
