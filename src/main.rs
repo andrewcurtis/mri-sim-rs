@@ -57,9 +57,9 @@ struct FseParams {
     t1: f64,
     t2: f64,
     esp: f64,
-    refocus_angle : f64,
-    cpmg_phase : f64,
-    debug_print : bool
+    refocus_angle: f64,
+    cpmg_phase: f64,
+    debug_print: bool,
 }
 
 fn fse_signal(params: FseParams) {
@@ -91,10 +91,6 @@ fn fse_signal(params: FseParams) {
     println!("Signal: {:?}", signal);
     println!("{:}", epg::vec::to_mxy(&epg));
     println!("{:}", epg::vec::to_mz(&epg));
-
-
-
-
 }
 
 fn main() {
@@ -105,9 +101,9 @@ fn main() {
         esp: 0.01,
         t1: 0.5,
         t2: 0.1,
-        refocus_angle: PI/2.0,
-        cpmg_phase: PI/2.0,
-        debug_print: false
+        refocus_angle: PI / 2.0,
+        cpmg_phase: PI / 2.0,
+        debug_print: false,
     };
     fse_signal(params);
 
