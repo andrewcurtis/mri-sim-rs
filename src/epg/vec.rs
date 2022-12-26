@@ -352,29 +352,10 @@ mod tests {
         // test if f_p(k) == conj(f_n(k))
 
         let mut epg = EPGVecRepresentation::new(16);
-        let etl = 0;
 
         let ex_45_30 = gen_rotation_matrix(PI / 4.0, PI / 6.0);
-        let refocus = gen_rotation_matrix(PI / 1.5, 0.0);
-
-        let t1 = 0.6_f64;
-        let t2 = 0.10_f64;
-        let dt = 0.02_f64;
-
-        let et1d = Complex::from((-dt / t1).exp());
-        let et2d = Complex::from((-dt / t2).exp());
 
         epg.rotate(&ex_45_30);
-
-        for _ in 0..etl {
-            epg.grelax(et1d, et2d, 1);
-            epg.rotate(&refocus);
-            epg.grelax(et1d, et2d, 1);
-        }
-
-        println!("fp = {:#?}", epg.f_p);
-
-        println!("fn = {:#?}", epg.f_n);
 
         let test_f_conj = epg
             .f_n
