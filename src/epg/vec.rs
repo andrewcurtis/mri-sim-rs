@@ -60,7 +60,8 @@ impl crate::types::EPG for EPGVecRepresentation {
     }
 
     fn excite(&mut self) {
-        let rot = gen_rotation_matrix(PI / 2.0, 0.0);
+        // 90 degree excitation about Y to generate pure x state from [0 0 1] mz.
+        let rot = gen_rotation_matrix(PI / 2.0, PI / 2.0);
         Self::rotate(self, &rot);
     }
 
@@ -110,13 +111,17 @@ pub(crate) fn to_mxy(epg: &EPGVecRepresentation) -> Complex64 {
 
 pub(crate) fn to_mz(epg: &EPGVecRepresentation) -> Complex64 {
     let mut mz = Complex64::from(0.0);
-    // sum every element of epg.z
-    mz = epg.z.iter().skip(1)
+    // sum every element of epg.z 1..
+    mz = epg
+        .z
+        .iter()
+        .skip(1)
         .enumerate()
         .map(|(ix, x)| x * (Complex::i() * (2.0 * PI * ix as f64)).exp())
         .sum();
-    mz = 2.0*mz + epg.z[0];
-    // sum every element of epg.f_n, skipping first
+    // double the sum (to account for duality of conjugate states that we don't allocate)
+    // and add 0 element
+    mz = 2.0 * mz + epg.z[0];
     mz
 }
 
@@ -338,6 +343,46 @@ mod tests {
         let signal = epg.read();
 
         let expected = et2d;
-        assert_eq!(signal, expected);
+        println!("expected = {:?}", expected);
+        println!("signal = {:?}", signal);
+        assert!(test_complex_close_l1(&expected, &signal, 1e-7));
+    }
+    #[test]
+    fn test_conjugate_states() {
+        // test if f_p(k) == conj(f_n(k))
+
+        let mut epg = EPGVecRepresentation::new(16);
+        let etl = 0;
+
+
+        let ex_45_30 = gen_rotation_matrix(PI / 4.0, PI/6.0);
+        let refocus = gen_rotation_matrix(PI / 1.5, 0.0);
+
+        let t1 = 0.6_f64;
+        let t2 = 0.10_f64;
+        let dt = 0.02_f64;
+
+        let et1d = Complex::from((-dt / t1).exp());
+        let et2d = Complex::from((-dt / t2).exp());
+
+        epg.rotate(&ex_45_30 );
+
+        for _ in 0..etl {
+            epg.grelax(et1d, et2d, 1);
+            epg.rotate(&refocus);
+            epg.grelax(et1d, et2d, 1);
+        }
+
+        println!("fp = {:#?}", epg.f_p);
+
+        println!("fn = {:#?}", epg.f_n);
+
+        let test_f_conj = epg
+            .f_n
+            .iter()
+            .zip(epg.f_p.iter())
+            .all(|(&a, &b)| test_complex_close_l1(&a, &b.conj(), 1e-7));
+
+        assert!(test_f_conj);
     }
 }
