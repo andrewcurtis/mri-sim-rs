@@ -24,3 +24,12 @@ maybe not:
   - fid
   - se
   - fse 
+- instead of directly simulating, let's have the sequence do params -> Vec<events>
+  then generatic simulate function that takes   Vec<events> -> Vec<complex> etc.
+
+
+- python interface : 
+  - use py03 / maturin to build extension
+  - more generic simulate entry point
+  - evenly spaced events
+  - Vec<event> how do we expose ADTs with data to python ?
