@@ -18,8 +18,8 @@ use types::EPG;
 fn demo() {
     println!("Hello, world!");
 
-    let params = sequences::fse::FseParams {
-        etl: 20,
+    let params = sequences::space::SpaceParams {
+        etl: 120,
         esp: 0.01,
         t1: 0.58,
         t2: 0.11,
@@ -27,7 +27,7 @@ fn demo() {
         cpmg_phase: PI / 2.0,
         debug_print: false,
     };
-    let res = sequences::fse::simulate(params);
+    let res = sequences::space::simulate(params);
     println!("{:?}", res);
 
 }
