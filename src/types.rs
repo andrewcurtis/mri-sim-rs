@@ -11,3 +11,21 @@ pub(crate) trait EPG {
     fn grelax(&mut self, et1d: Complex64, et2d: Complex64, ntwists: i32);
     fn delay(&mut self, et1d: Complex64, et2d: Complex64);
 }
+
+
+pub enum Tissue {
+    WhiteMatter,
+    GreyMatter,
+    Caudate, 
+    CerebroSpinalFluid,
+    Thalamus,
+    Blood
+}
+
+pub struct TissueProperties {
+    pub name: &'static str,
+    pub pd: f32,
+    pub t1: f32,
+    pub t2: f32,
+    pub t2s: f32,
+}

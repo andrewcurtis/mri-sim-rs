@@ -319,7 +319,6 @@ mod tests {
         println!("{:?}", epg2);
 
         epg_close(&epg, &epg2);
-        assert_eq!(&epg, &epg2);
     }
 
     #[test]

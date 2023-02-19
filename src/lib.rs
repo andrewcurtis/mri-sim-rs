@@ -10,8 +10,8 @@ use std::f64::consts::PI;
 mod epg;
 mod sequences;
 mod types;
+mod tissues;
 
-use types::EPG;
 
 
 #[pyfunction]
