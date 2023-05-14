@@ -72,9 +72,6 @@ impl Default for EPGArrayRepresentation {
 // stopped ehre --- 
 
 fn rf_rotation(epg: &mut EPGArrayRepresentation, rmat: &Array<Complex64, Ix2>) {
-    // Think we want iter lanes 
-    // see https://docs.rs/ndarray/latest/ndarray/struct.ArrayBase.html#method.lanes
-    // and https://docs.rs/ndarray/latest/ndarray/iter/index.html
     let rot = rmat.dot(&epg.fzk);
     epg.fzk = rot;
 }
@@ -93,9 +90,34 @@ fn relaxation(epg: &mut EPGArrayRepresentation, dt: f64, t1: f64, t2: f64) {
 
 }
 
+fn relaxation2(epg: &mut EPGArrayRepresentation, dt: f64, t1: f64, t2: f64) {
+    let t1d = Complex::from((-dt / t1).exp());
+    let t2d = Complex::from((-dt / t2).exp());
+
+    // f pos and f - (rows 0 and 1) get attentuated by t2 decay for all
+    epg.fzk[[0, 0]] *= t2d;
+    epg.fzk[[1, 0]] *= t2d;
+
+    // z0 has special handling
+    epg.fzk[[2, 0]] = (1.0-t1d) + (epg.fzk[[2,0]] * t1d);
+
+    // From the second element onward
+    for i in 1..epg.length {
+        epg.fzk[[0, i]] *= t2d;
+        epg.fzk[[1, i]] *= t2d;
+
+        // z states attenuate by t1 decay
+        epg.fzk[[2, i]] *= t1d;
+    }
+}
+
+
 fn gradient_shift(epg: &mut EPGArrayRepresentation, ntwists: i32) {
     // Shift states.
     // nshfits represents the number of 2pi dephasing steps to shift by
+    // In the fzk array, each 2pi shift represents rotating by one index location
+    // as states cross zero (from negative to positive), they wrap
+
     // F0 is special, since f_p [0] is f0, and f_n[0] is f0*(conj)
 
     // can we do a[1..end] = a[0..end-1] etc? 
@@ -109,6 +131,58 @@ fn gradient_shift(epg: &mut EPGArrayRepresentation, ntwists: i32) {
         }
         n if n < 0 => {
             // f_p becomes less positive. f_m becomes more negative
+        }
+        _ => unreachable!("Should never happen."),
+    }
+}
+
+
+fn gradient_shift_gtp1(epg: &mut EPGArrayRepresentation, ntwists: i32) {
+    match ntwists {
+        n if n == 0 => return,
+        n if n > 0 => {
+            // Iterate over ntwists
+            for _ in 0..n {
+                // Shift f_p right by 1
+                let last_fp = epg.fzk[[0, epg.length - 1]];
+                for i in (1..epg.length).rev() {
+                    epg.fzk[[0, i]] = epg.fzk[[0, i - 1]];
+                }
+
+                // Move the first element of f_n to f_p
+                let first_fn = epg.fzk[[1, 0]];
+                epg.fzk[[0, 0]] = first_fn.conj();
+
+                // Shift f_n right by 1
+                for i in 0..epg.length - 1 {
+                    epg.fzk[[1, i]] = epg.fzk[[1, i + 1]];
+                }
+
+                // Wrap the last element of f_p to f_n
+                epg.fzk[[1, epg.length - 1]] = last_fp.conj();
+            }
+        }
+        n if n < 0 => {
+            // Iterate over -ntwists
+            for _ in 0..-n {
+                // Shift f_n left by 1
+                let first_fn = epg.fzk[[1, 0]];
+                for i in 0..epg.length - 1 {
+                    epg.fzk[[1, i]] = epg.fzk[[1, i + 1]];
+                }
+
+                // Move the last element of f_p to f_n
+                let last_fp = epg.fzk[[0, epg.length - 1]];
+                epg.fzk[[1, epg.length - 1]] = last_fp.conj();
+
+                // Shift f_p left by 1
+                for i in (1..epg.length).rev() {
+                    epg.fzk[[0, i]] = epg.fzk[[0, i - 1]];
+                }
+
+                // Wrap the first element of f_n to f_p
+                epg.fzk[[0, 0]] = first_fn.conj();
+            }
         }
         _ => unreachable!("Should never happen."),
     }

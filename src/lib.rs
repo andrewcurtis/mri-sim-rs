@@ -8,9 +8,9 @@ use pyo3::prelude::*;
 use std::f64::consts::PI;
 
 mod epg;
-mod sequences;
-mod types;
-mod tissues;
+pub mod sequences;
+pub mod types;
+//mod tissues;
 
 
 
@@ -19,16 +19,16 @@ fn demo() {
     println!("Hello, world!");
 
     let params = sequences::space::SpaceParams {
-        etl: 120,
+        etl: 220,
         esp: 0.01,
         t1: 0.58,
         t2: 0.11,
-        refocus_angle: PI / 2.0,
+        refocus_angle: PI,
         cpmg_phase: PI / 2.0,
         debug_print: false,
     };
     let res = sequences::space::simulate(params);
-    println!("{:?}", res);
+    //println!("{:?}", res);
 
 }
 

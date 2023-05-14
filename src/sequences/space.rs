@@ -45,3 +45,4 @@ pub fn simulate(params: SpaceParams) -> Vec<Complex64>{
 
     return signal;
 }
+
